@@ -12,18 +12,18 @@ cortex-m-rt = "0.7.0"
 
 [dependencies.embassy-executor]
 version = "0.5.0"
-path = "/local/src/old/embassy/embassy-executor"
+git = "http://github.com/embassy-rs/embassy"
 #features = ["defmt", "integrated-timers", "arch-cortex-m", "executor-thread"]
 features = ["integrated-timers", "arch-cortex-m", "executor-thread"]
 
 [dependencies.embassy-time]
 version = "0.3.0"
-path = "/local/src/old/embassy/embassy-time"
+git = "http://github.com/embassy-rs/embassy"
 #features = ["defmt"]
 
 [dependencies.embassy-nrf]
 version = "0.1.0"
-path = "/local/src/old/embassy/embassy-nrf"
+git = "http://github.com/embassy-rs/embassy"
 #features = ["defmt", "nrf52833", "time-driver-rtc1", "gpiote"]
 features = ["nrf52833", "time-driver-rtc1", "gpiote"]
 
