@@ -1,31 +1,25 @@
 [package]
 authors = ["Dario Nieuwenhuis <dirbaio@dirbaio.net>"]
 edition = "2021"
-name = "embassy-basic-example"
+name = "mb2-embassy-blinky"
 version = "0.1.0"
-resolver = "2"
 
 [dependencies]
-#defmt = "0.3.0"
-#defmt-rtt = "0.3.0"
+defmt = "0.3.0"
+defmt-rtt = "0.3.0"
 cortex-m-rt = "0.7.0"
 
 [dependencies.embassy-executor]
 version = "0.5.0"
-git = "http://github.com/embassy-rs/embassy"
-#features = ["defmt", "integrated-timers", "arch-cortex-m", "executor-thread"]
-features = ["integrated-timers", "arch-cortex-m", "executor-thread"]
+features = ["defmt", "integrated-timers", "arch-cortex-m", "executor-thread"]
 
 [dependencies.embassy-time]
 version = "0.3.0"
-git = "http://github.com/embassy-rs/embassy"
-#features = ["defmt"]
+features = ["defmt"]
 
 [dependencies.embassy-nrf]
 version = "0.1.0"
-git = "http://github.com/embassy-rs/embassy"
-#features = ["defmt", "nrf52833", "time-driver-rtc1", "gpiote"]
-features = ["nrf52833", "time-driver-rtc1", "gpiote"]
+features = ["defmt", "nrf52833", "time-driver-rtc1", "gpiote", "nfc-pins-as-gpio"]
 
 [dependencies.cortex-m]
 version = "0.7.0"
@@ -33,4 +27,7 @@ features = ["critical-section-single-core"]
 
 [dependencies.panic-probe]
 version = "0.3.0"
-#features = ["print-defmt"]
+features = ["print-defmt"]
+
+[profile.release]
+debug = 2
