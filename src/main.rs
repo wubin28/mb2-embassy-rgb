@@ -6,19 +6,20 @@ use embassy_executor::Spawner;
 use microbit_bsp::{
     Microbit,
     LedMatrix,
-    display::Frame,
+    display::{Frame, Brightness},
     embassy_nrf::gpio::{Level, Output, OutputDrive, AnyPin},
 };
 use embassy_time::{Duration, Timer};
 use defmt_rtt as _;
 use panic_probe as _;
 
-#[embassy_executor::task(pool = 1)]
+#[embassy_executor::task]
 async fn mb2_blinker(
     mut display: LedMatrix,
     interval: Duration,
 ) -> ! {
     display.clear();
+    display.set_brightness(Brightness::MAX);
     let mut frame = Frame::default();
     loop {
         frame.set(0, 0);
@@ -31,7 +32,7 @@ async fn mb2_blinker(
     }
 }
 
-#[embassy_executor::task(pool = 1)]
+#[embassy_executor::task]
 async fn rgb_blinker(
     mut rgb: [Output<'static, AnyPin>; 3],
     interval: Duration,
@@ -62,5 +63,5 @@ async fn main(spawner: Spawner) {
 
     println!("spawning");
     unwrap!(spawner.spawn(mb2_blinker(display, Duration::from_millis(500))));
-    unwrap!(rgb_blinker([red, green, blue], Duration::from_millis(500)));
+    unwrap!(spawner.spawn(rgb_blinker([red, green, blue], Duration::from_millis(500))));
 }
