@@ -7,7 +7,11 @@ use microbit_bsp::{
     Microbit,
     LedMatrix,
     display::{Frame, Brightness},
-    embassy_nrf::gpio::{Level, Output, OutputDrive, AnyPin},
+    embassy_nrf::{
+        gpio::{Level, Output, OutputDrive, AnyPin},
+        saadc,
+        bind_interrupts,
+    },
 };
 use embassy_time::{Duration, Timer};
 use defmt_rtt as _;
@@ -23,11 +27,9 @@ async fn mb2_blinker(
     let mut frame = Frame::default();
     loop {
         frame.set(0, 0);
-        println!("high");
         display.display(frame, interval).await;
 
         frame.unset(0, 0);
-        println!("low");
         display.display(frame, interval).await;
     }
 }
@@ -37,15 +39,23 @@ async fn rgb_blinker(
     mut rgb: [Output<'static, AnyPin>; 3],
     interval: Duration,
 ) -> ! {
-    let names = ["red", "green", "blue"];
     let mut cur = 0;
     loop {
         let prev = (cur + 2) % 3;
         rgb[prev].set_low();
         rgb[cur].set_high();
-        println!("{}", names[cur]);
         Timer::after(interval).await;
         cur = (cur + 1) % 3;
+    }
+}
+
+#[embassy_executor::task]
+async fn knob(mut saadc: saadc::Saadc<'static, 1>) -> ! {
+    loop {
+        let mut buf = [0];
+        saadc.sample(&mut buf).await;
+        println!("knob {}", buf[0]);
+        Timer::after_millis(500).await;
     }
 }
 
@@ -54,6 +64,10 @@ async fn main(spawner: Spawner) {
     let board = Microbit::default();
     let display = board.display;
     
+    bind_interrupts!(struct Irqs {
+        SAADC => saadc::InterruptHandler;
+    });
+
     let led_pin = |p| {
         Output::new(p, Level::Low, OutputDrive::Standard)
     };
@@ -61,7 +75,17 @@ async fn main(spawner: Spawner) {
     let green = led_pin(AnyPin::from(board.p8));
     let blue = led_pin(AnyPin::from(board.p16));
 
+    let mut saadc_config = saadc::Config::default();
+    saadc_config.resolution = saadc::Resolution::_14BIT;
+    let saadc = saadc::Saadc::new(
+        board.saadc,
+        Irqs,
+        saadc_config,
+        [saadc::ChannelConfig::single_ended(board.p2)],
+    );
+
     println!("spawning");
     unwrap!(spawner.spawn(mb2_blinker(display, Duration::from_millis(500))));
     unwrap!(spawner.spawn(rgb_blinker([red, green, blue], Duration::from_millis(500))));
+    unwrap!(spawner.spawn(knob(saadc)));
 }
