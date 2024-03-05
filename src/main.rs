@@ -2,26 +2,22 @@
 #![no_main]
 
 use defmt::*;
-use embassy_executor::Spawner;
-use microbit_bsp::{
-    Microbit,
-    LedMatrix,
-    display::{Frame, Brightness},
-    embassy_nrf::{
-        gpio::{Level, Output, OutputDrive, AnyPin},
-        saadc,
-        bind_interrupts,
-    },
-};
-use embassy_time::{Duration, Timer};
 use defmt_rtt as _;
+use embassy_executor::Spawner;
+use embassy_time::{Duration, Timer};
+use microbit_bsp::{
+    display::{Brightness, Frame},
+    embassy_nrf::{
+        bind_interrupts,
+        gpio::{AnyPin, Level, Output, OutputDrive},
+        saadc,
+    },
+    LedMatrix, Microbit,
+};
 use panic_probe as _;
 
 #[embassy_executor::task]
-async fn mb2_blinker(
-    mut display: LedMatrix,
-    interval: Duration,
-) -> ! {
+async fn mb2_blinker(mut display: LedMatrix, interval: Duration) -> ! {
     display.clear();
     display.set_brightness(Brightness::MAX);
     let mut frame = Frame::default();
@@ -35,10 +31,7 @@ async fn mb2_blinker(
 }
 
 #[embassy_executor::task]
-async fn rgb_blinker(
-    mut rgb: [Output<'static, AnyPin>; 3],
-    interval: Duration,
-) -> ! {
+async fn rgb_blinker(mut rgb: [Output<'static, AnyPin>; 3], interval: Duration) -> ! {
     let mut cur = 0;
     loop {
         let prev = (cur + 2) % 3;
@@ -63,14 +56,12 @@ async fn knob(mut saadc: saadc::Saadc<'static, 1>) -> ! {
 async fn main(spawner: Spawner) {
     let board = Microbit::default();
     let display = board.display;
-    
+
     bind_interrupts!(struct Irqs {
         SAADC => saadc::InterruptHandler;
     });
 
-    let led_pin = |p| {
-        Output::new(p, Level::Low, OutputDrive::Standard)
-    };
+    let led_pin = |p| Output::new(p, Level::Low, OutputDrive::Standard);
     let red = led_pin(AnyPin::from(board.p9));
     let green = led_pin(AnyPin::from(board.p8));
     let blue = led_pin(AnyPin::from(board.p16));
