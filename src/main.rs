@@ -9,8 +9,9 @@ use embassy_sync::{
     mutex::Mutex,
     blocking_mutex::raw::ThreadModeRawMutex,
 };
+use embassy_futures::join;
 use microbit_bsp::{
-    display::{Brightness, Frame},
+    display::Brightness,
     embassy_nrf::{
         bind_interrupts,
         gpio::{AnyPin, Level, Output, OutputDrive},
@@ -28,39 +29,38 @@ struct Mb2Blinker {
 }
 
 impl Mb2Blinker {
-    fn new(mut display: LedMatrix) {
+    fn new(mut display: LedMatrix) -> Self {
         display.clear();
         display.set_brightness(Brightness::MAX);
         Self{ display, state: false }
     }
 
-    #[embassy_executor::task]
     async fn step(&mut self) {
         if self.state {
-            self.display.frame.set(0, 0);
+            self.display.on(0, 0);
         } else {
-            self.display.frame.unset(0, 0);
+            self.display.off(0, 0);
         }
+        self.display.display(frame, Duration::from_millis(500)).await;
     }
 }
 
 struct RgbBlinker {
     rgb: [Output<'static, AnyPin>; 3],
-    cur: u8,
+    cur: usize,
 }
 
 impl RgbBlinker {
-    fn new(rgb: [Output<'static, AnyPin>; 3]) {
+    fn new(rgb: [Output<'static, AnyPin>; 3]) -> Self {
         Self { rgb, cur: 0 }
     }
 
-    #[embassy_executor::task]
     async fn step(&mut self) {
         let prev = (self.cur + 2) % 3;
         self.rgb[prev].set_low();
         self.rgb[self.cur].set_high();
-        Timer::after(interval).await;
         self.cur = (self.cur + 1) % 3;
+        Timer::after_millis(500).await;
     }
 }
 
@@ -101,14 +101,16 @@ async fn main(spawner: Spawner) {
         [saadc::ChannelConfig::single_ended(board.p2)],
     );
 
-    let mb2_blinker = Mb2Blinker::new(display);
-    let rgb_blinker = RgbBlinker::new([red, green, blue]);
+    let mut mb2_blinker = Mb2Blinker::new(display);
+    let mut rgb_blinker = RgbBlinker::new([red, green, blue]);
     println!("spawning knob");
     unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(100))));
     println!("stepping");
     loop {
-        println!("step");
-        unwrap!(spawner.spawn(mb2_blinker.step()));
-        unwrap!(spawner.spawn(rgb_blinker.step()));
+        // println!("step");
+        join(
+            mb2_blinker.step(),
+            rgb_blinker.step(),
+        ).await;
     }
 }
