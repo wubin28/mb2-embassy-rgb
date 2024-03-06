@@ -22,29 +22,45 @@ use panic_probe as _;
 
 static KNOB_VALUE: Mutex<ThreadModeRawMutex, i16> = Mutex::new(0);
 
-#[embassy_executor::task]
-async fn mb2_blinker(mut display: LedMatrix, interval: Duration) -> ! {
-    display.clear();
-    display.set_brightness(Brightness::MAX);
-    let mut frame = Frame::default();
-    loop {
-        frame.set(0, 0);
-        display.display(frame, interval).await;
+struct Mb2Blinker {
+    display: LedMatrix,
+    state: bool,
+}
 
-        frame.unset(0, 0);
-        display.display(frame, interval).await;
+impl Mb2Blinker {
+    fn new(mut display: LedMatrix) {
+        display.clear();
+        display.set_brightness(Brightness::MAX);
+        Self{ display, state: false }
+    }
+
+    #[embassy_executor::task]
+    async fn step(&mut self) {
+        if self.state {
+            self.display.frame.set(0, 0);
+        } else {
+            self.display.frame.unset(0, 0);
+        }
     }
 }
 
-#[embassy_executor::task]
-async fn rgb_blinker(mut rgb: [Output<'static, AnyPin>; 3], interval: Duration) -> ! {
-    let mut cur = 0;
-    loop {
-        let prev = (cur + 2) % 3;
-        rgb[prev].set_low();
-        rgb[cur].set_high();
+struct RgbBlinker {
+    rgb: [Output<'static, AnyPin>; 3],
+    cur: u8,
+}
+
+impl RgbBlinker {
+    fn new(rgb: [Output<'static, AnyPin>; 3]) {
+        Self { rgb, cur: 0 }
+    }
+
+    #[embassy_executor::task]
+    async fn step(&mut self) {
+        let prev = (self.cur + 2) % 3;
+        self.rgb[prev].set_low();
+        self.rgb[self.cur].set_high();
         Timer::after(interval).await;
-        cur = (cur + 1) % 3;
+        self.cur = (self.cur + 1) % 3;
     }
 }
 
@@ -85,8 +101,14 @@ async fn main(spawner: Spawner) {
         [saadc::ChannelConfig::single_ended(board.p2)],
     );
 
-    println!("spawning");
-    unwrap!(spawner.spawn(mb2_blinker(display, Duration::from_millis(500))));
-    unwrap!(spawner.spawn(rgb_blinker([red, green, blue], Duration::from_millis(500))));
+    let mb2_blinker = Mb2Blinker::new(display);
+    let rgb_blinker = RgbBlinker::new([red, green, blue]);
+    println!("spawning knob");
     unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(100))));
+    println!("stepping");
+    loop {
+        println!("step");
+        unwrap!(spawner.spawn(mb2_blinker.step()));
+        unwrap!(spawner.spawn(rgb_blinker.step()));
+    }
 }
