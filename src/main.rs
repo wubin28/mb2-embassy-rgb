@@ -5,6 +5,10 @@ use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
+use embassy_sync::{
+    mutex::Mutex,
+    blocking_mutex::raw::ThreadModeRawMutex,
+};
 use microbit_bsp::{
     display::{Brightness, Frame},
     embassy_nrf::{
@@ -15,6 +19,8 @@ use microbit_bsp::{
     LedMatrix, Microbit,
 };
 use panic_probe as _;
+
+static KNOB_VALUE: Mutex<ThreadModeRawMutex, i16> = Mutex::new(0);
 
 #[embassy_executor::task]
 async fn mb2_blinker(mut display: LedMatrix, interval: Duration) -> ! {
@@ -47,7 +53,11 @@ async fn knob(mut saadc: saadc::Saadc<'static, 1>, interval: Duration) -> ! {
     loop {
         let mut buf = [0];
         saadc.sample(&mut buf).await;
-        println!("knob {}", buf[0]);
+
+        let mut knob_value = KNOB_VALUE.lock().await;
+        *knob_value = buf[0];
+        drop(knob_value);
+
         Timer::after(interval).await;
     }
 }
@@ -78,5 +88,5 @@ async fn main(spawner: Spawner) {
     println!("spawning");
     unwrap!(spawner.spawn(mb2_blinker(display, Duration::from_millis(500))));
     unwrap!(spawner.spawn(rgb_blinker([red, green, blue], Duration::from_millis(500))));
-    unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(500))));
+    unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(100))));
 }
