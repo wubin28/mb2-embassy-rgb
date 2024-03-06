@@ -43,12 +43,12 @@ async fn rgb_blinker(mut rgb: [Output<'static, AnyPin>; 3], interval: Duration) 
 }
 
 #[embassy_executor::task]
-async fn knob(mut saadc: saadc::Saadc<'static, 1>) -> ! {
+async fn knob(mut saadc: saadc::Saadc<'static, 1>, interval: Duration) -> ! {
     loop {
         let mut buf = [0];
         saadc.sample(&mut buf).await;
         println!("knob {}", buf[0]);
-        Timer::after_millis(500).await;
+        Timer::after(interval).await;
     }
 }
 
@@ -78,5 +78,5 @@ async fn main(spawner: Spawner) {
     println!("spawning");
     unwrap!(spawner.spawn(mb2_blinker(display, Duration::from_millis(500))));
     unwrap!(spawner.spawn(rgb_blinker([red, green, blue], Duration::from_millis(500))));
-    unwrap!(spawner.spawn(knob(saadc)));
+    unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(500))));
 }
