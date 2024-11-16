@@ -9,9 +9,9 @@ use embassy_sync::{
     mutex::Mutex,
     blocking_mutex::raw::ThreadModeRawMutex,
 };
-use embassy_futures::join;
+use embassy_futures::join::join;
 use microbit_bsp::{
-    display::Brightness,
+    display::{Brightness, Frame},
     embassy_nrf::{
         bind_interrupts,
         gpio::{AnyPin, Level, Output, OutputDrive},
@@ -36,12 +36,16 @@ impl Mb2Blinker {
     }
 
     async fn step(&mut self) {
+        // 创建一个新的空 Frame
+        let mut frame = Frame::default();
+        
+        // 根据状态设置 LED
         if self.state {
-            self.display.on(0, 0);
-        } else {
-            self.display.off(0, 0);
+            frame.set(0, 0);  // 使用 set 方法设置 LED
         }
+        
         self.display.display(frame, Duration::from_millis(500)).await;
+        self.state = !self.state;
     }
 }
 
@@ -107,7 +111,6 @@ async fn main(spawner: Spawner) {
     unwrap!(spawner.spawn(knob(saadc, Duration::from_millis(100))));
     println!("stepping");
     loop {
-        // println!("step");
         join(
             mb2_blinker.step(),
             rgb_blinker.step(),
